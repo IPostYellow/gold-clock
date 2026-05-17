@@ -30,6 +30,7 @@ public class PriceMonitorService extends Service {
     public static final String EXTRA_CNY_PER_GRAM = "cny_per_gram";
     public static final String EXTRA_USD_TO_CNY = "usd_to_cny";
     public static final String EXTRA_FETCHED_AT = "fetched_at";
+    public static final String EXTRA_SOURCE = "source";
     public static final String EXTRA_ERROR = "error";
 
     private static final String CHANNEL_MONITOR = "gold_clock_monitor";
@@ -207,6 +208,7 @@ public class PriceMonitorService extends Service {
         intent.putExtra(EXTRA_CNY_PER_GRAM, price.cnyPerGram);
         intent.putExtra(EXTRA_USD_TO_CNY, price.usdToCny);
         intent.putExtra(EXTRA_FETCHED_AT, price.fetchedAtMillis);
+        intent.putExtra(EXTRA_SOURCE, price.sourceName);
         sendBroadcast(intent);
     }
 

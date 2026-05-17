@@ -65,7 +65,8 @@ public class MainActivity extends Activity {
                         intent.getDoubleExtra(PriceMonitorService.EXTRA_USD_PER_OUNCE, 0d),
                         intent.getDoubleExtra(PriceMonitorService.EXTRA_CNY_PER_GRAM, 0d),
                         intent.getDoubleExtra(PriceMonitorService.EXTRA_USD_TO_CNY, 0d),
-                        intent.getLongExtra(PriceMonitorService.EXTRA_FETCHED_AT, System.currentTimeMillis()));
+                        intent.getLongExtra(PriceMonitorService.EXTRA_FETCHED_AT, System.currentTimeMillis()),
+                        intent.getStringExtra(PriceMonitorService.EXTRA_SOURCE));
                 handlePriceUpdate(price);
             } else if (PriceMonitorService.ACTION_PRICE_ERROR.equals(action)) {
                 setRefreshing(false);
@@ -192,7 +193,7 @@ public class MainActivity extends Activity {
         cnyPriceText.setText(String.format(Locale.CHINA, "¥%,.2f / 克", price.cnyPerGram));
         usdPriceText.setText(String.format(Locale.CHINA, "$%,.2f / 金衡盎司", price.usdPerOunce));
         rateText.setText(String.format(Locale.CHINA, "USD/CNY %.4f", price.usdToCny));
-        statusText.setText("数据源：Convertz metals API");
+        statusText.setText("数据源：" + sourceLabel(price.sourceName));
         lastUpdatedText.setText("最后更新：" + DateFormat.getDateTimeInstance(
                 DateFormat.SHORT,
                 DateFormat.MEDIUM,
@@ -329,6 +330,13 @@ public class MainActivity extends Activity {
             return String.format(Locale.CHINA, "$%,.2f", value);
         }
         return String.format(Locale.CHINA, "¥%,.2f", value);
+    }
+
+    private String sourceLabel(String sourceName) {
+        if (sourceName == null || sourceName.trim().isEmpty() || "Unknown".equals(sourceName)) {
+            return "金价 API";
+        }
+        return sourceName;
     }
 
     private String readableError(Exception exception) {

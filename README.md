@@ -23,10 +23,13 @@ Gold Clock 是一个原生 Android 应用，用于查看实时黄金价格，并
 
 ## 数据源
 
-当前接入 [Convertz API](https://convertz.app/api-docs)：
+当前优先接入 [Convertz API](https://convertz.app/api-docs)，并内置两个免 key 备用源：
 
-- `GET https://convertz.app/api/metals` 获取 XAU 美元/金衡盎司价格。
+- `GET https://convertz.app/api/metals` 获取 XAU 美元/金衡盎司价格，兼容 `prices.XAU.USD` 和旧版 `XAU.price` 返回结构。
+- `GET https://api.gold-api.com/price/XAU` 作为实时金价备用源。
+- `GET https://www.vang.today/api/prices?type=XAUUSD` 作为实时金价备用源。
 - `GET https://convertz.app/api/currency` 获取 USD/CNY 汇率。
+- `GET https://open.er-api.com/v6/latest/USD` 作为 USD/CNY 汇率备用源。
 - 应用内按 `美元/盎司 * USD/CNY / 31.1034768` 计算人民币/克。
 
 生产发布前建议把数据源抽到自己的后端代理，便于切换供应商、做缓存、监控失败率，并避免移动端直接依赖单一免费 API。
