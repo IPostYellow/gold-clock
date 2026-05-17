@@ -1,0 +1,17 @@
+<resources>
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@color/canvas</item>
+        <item name="android:navigationBarColor">@color/canvas</item>
+        <item name="android:colorAccent">@color/gold</item>
+        <item name="android:buttonStyle">@style/GoldClockButton</item>
+    </style>
+
+    <style name="GoldClockButton" parent="@android:style/Widget.Material.Button">
+        <item name="android:minHeight">44dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+</resources>

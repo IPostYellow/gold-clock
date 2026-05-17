@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Gold Clock</string>
+
+    <string-array name="alert_conditions">
+        <item>上涨到或高于</item>
+        <item>下跌到或低于</item>
+    </string-array>
+
+    <string-array name="alert_units">
+        <item>人民币/克</item>
+        <item>美元/金衡盎司</item>
+    </string-array>
+</resources>
