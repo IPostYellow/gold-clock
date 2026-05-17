@@ -11,6 +11,12 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 
 public class GoldPriceRepository {
     private static final String CONVERTZ_METALS_URL = "https://convertz.app/api/metals";
@@ -18,6 +24,9 @@ public class GoldPriceRepository {
     private static final String EXCHANGE_RATE_URL = "https://open.er-api.com/v6/latest/USD";
     private static final String GOLD_API_XAU_URL = "https://api.gold-api.com/price/XAU";
     private static final String VANG_TODAY_XAU_URL = "https://www.vang.today/api/prices?type=XAUUSD";
+    private static final String VANG_TODAY_HISTORY_URL = "https://www.vang.today/api/prices?type=XAUUSD&days=30";
+    private static final String GOLD_FUTURES_CHART_URL =
+            "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?range=3mo&interval=1d";
     private static final double TROY_OUNCE_GRAMS = 31.1034768d;
 
     public GoldPrice fetchPrice() throws IOException, JSONException {
@@ -42,6 +51,124 @@ public class GoldPriceRepository {
         }
 
         throw new IOException("All gold price sources failed: " + errors);
+    }
+
+    public KLineSeries fetchKLineSeries() throws IOException, JSONException {
+        StringBuilder errors = new StringBuilder();
+        try {
+            return new KLineSeries(fetchYahooKLineEntries(), "Yahoo Finance · GC=F");
+        } catch (Exception exception) {
+            appendError(errors, "Yahoo Finance", exception);
+        }
+
+        try {
+            return new KLineSeries(fetchVangTodayKLineEntries(), "Vang Today · 近似日 K");
+        } catch (Exception exception) {
+            appendError(errors, "Vang Today K", exception);
+        }
+
+        throw new IOException("All chart sources failed: " + errors);
+    }
+
+    private List<KLineEntry> fetchYahooKLineEntries() throws IOException, JSONException {
+        JSONObject root = readJson(GOLD_FUTURES_CHART_URL);
+        JSONObject chart = root.optJSONObject("chart");
+        if (chart == null) {
+            throw new JSONException("Missing chart data");
+        }
+        if (!chart.isNull("error")) {
+            throw new JSONException("Chart API error: " + chart.opt("error"));
+        }
+
+        JSONArray results = chart.optJSONArray("result");
+        JSONObject result = results == null ? null : results.optJSONObject(0);
+        if (result == null) {
+            throw new JSONException("Missing chart result");
+        }
+
+        JSONArray timestamps = result.optJSONArray("timestamp");
+        JSONObject indicators = result.optJSONObject("indicators");
+        JSONArray quotes = indicators == null ? null : indicators.optJSONArray("quote");
+        JSONObject quote = quotes == null ? null : quotes.optJSONObject(0);
+        if (timestamps == null || quote == null) {
+            throw new JSONException("Missing OHLC arrays");
+        }
+
+        JSONArray opens = quote.optJSONArray("open");
+        JSONArray highs = quote.optJSONArray("high");
+        JSONArray lows = quote.optJSONArray("low");
+        JSONArray closes = quote.optJSONArray("close");
+
+        List<KLineEntry> entries = new ArrayList<>();
+        int count = timestamps.length();
+        for (int i = 0; i < count; i++) {
+            double open = optFiniteDouble(opens, i);
+            double high = optFiniteDouble(highs, i);
+            double low = optFiniteDouble(lows, i);
+            double close = optFiniteDouble(closes, i);
+            if (Double.isNaN(open) || Double.isNaN(high) || Double.isNaN(low) || Double.isNaN(close)) {
+                continue;
+            }
+            entries.add(new KLineEntry(timestamps.optLong(i), open, high, low, close));
+        }
+
+        if (entries.isEmpty()) {
+            throw new JSONException("No valid OHLC entries");
+        }
+        return entries;
+    }
+
+    private List<KLineEntry> fetchVangTodayKLineEntries() throws IOException, JSONException {
+        JSONObject root = readJson(VANG_TODAY_HISTORY_URL);
+        if (!root.optBoolean("success", false)) {
+            throw new JSONException("Vang Today history request failed");
+        }
+
+        JSONArray history = root.optJSONArray("history");
+        if (history == null || history.length() == 0) {
+            throw new JSONException("Missing Vang Today history");
+        }
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        List<KLineEntry> entries = new ArrayList<>();
+        for (int i = history.length() - 1; i >= 0; i--) {
+            JSONObject day = history.optJSONObject(i);
+            if (day == null) {
+                continue;
+            }
+            JSONObject prices = day.optJSONObject("prices");
+            JSONObject xau = prices == null ? null : prices.optJSONObject("XAUUSD");
+            if (xau == null) {
+                continue;
+            }
+
+            double close = xau.optDouble("buy", 0d);
+            double change = xau.optDouble("day_change_buy", 0d);
+            if (close <= 0d) {
+                continue;
+            }
+
+            long timestampSeconds;
+            try {
+                Date date = dateFormat.parse(day.optString("date"));
+                if (date == null) {
+                    continue;
+                }
+                timestampSeconds = date.getTime() / 1000L;
+            } catch (ParseException exception) {
+                continue;
+            }
+
+            double open = close - change;
+            double high = Math.max(open, close);
+            double low = Math.min(open, close);
+            entries.add(new KLineEntry(timestampSeconds, open, high, low, close));
+        }
+
+        if (entries.isEmpty()) {
+            throw new JSONException("No valid Vang Today entries");
+        }
+        return entries;
     }
 
     private GoldPrice fetchFromConvertz() throws IOException, JSONException {
@@ -162,7 +289,8 @@ public class GoldPriceRepository {
             URL url = new URL(urlString);
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
-            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Accept", "application/json, text/plain, */*");
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 GoldClock/1.0");
             connection.setConnectTimeout(10_000);
             connection.setReadTimeout(10_000);
 
@@ -199,6 +327,14 @@ public class GoldPriceRepository {
             }
         }
         return builder.toString();
+    }
+
+    private double optFiniteDouble(JSONArray array, int index) {
+        if (array == null || index >= array.length() || array.isNull(index)) {
+            return Double.NaN;
+        }
+        double value = array.optDouble(index, Double.NaN);
+        return Double.isInfinite(value) ? Double.NaN : value;
     }
 
     private void appendError(StringBuilder builder, String source, Exception exception) {

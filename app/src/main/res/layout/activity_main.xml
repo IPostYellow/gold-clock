@@ -138,6 +138,53 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="黄金期货日 K"
+                    android:textColor="@color/ink"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/refreshChartButton"
+                    android:layout_width="86dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/bg_button_secondary"
+                    android:text="刷新"
+                    android:textColor="@color/ink" />
+            </LinearLayout>
+
+            <com.example.goldclock.KLineChartView
+                android:id="@+id/kLineChartView"
+                android:layout_width="match_parent"
+                android:layout_height="260dp"
+                android:layout_marginTop="12dp" />
+
+            <TextView
+                android:id="@+id/chartStatusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="等待加载 K 线"
+                android:textColor="@color/muted"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
             android:background="@drawable/bg_card_alt"
             android:orientation="vertical"
             android:padding="16dp">
@@ -183,6 +230,15 @@
                 android:background="@drawable/bg_button_primary"
                 android:text="添加"
                 android:textColor="@android:color/white" />
+
+            <Button
+                android:id="@+id/testAlertButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_button_secondary"
+                android:text="测试闹钟提醒"
+                android:textColor="@color/ink" />
         </LinearLayout>
 
         <TextView

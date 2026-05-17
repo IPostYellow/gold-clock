@@ -44,10 +44,14 @@ public class MainActivity extends Activity {
     private TextView rateText;
     private TextView statusText;
     private TextView lastUpdatedText;
+    private TextView chartStatusText;
     private TextView emptyAlertsText;
+    private KLineChartView kLineChartView;
     private ProgressBar refreshProgress;
     private Button refreshButton;
+    private Button refreshChartButton;
     private Button addAlertButton;
+    private Button testAlertButton;
     private Switch monitorSwitch;
     private Spinner conditionSpinner;
     private Spinner unitSpinner;
@@ -92,6 +96,7 @@ public class MainActivity extends Activity {
 
         renderAlerts();
         refreshPrice();
+        refreshKLine();
 
         if (storage.isMonitoringEnabled()) {
             startMonitorService();
@@ -133,10 +138,14 @@ public class MainActivity extends Activity {
         rateText = findViewById(R.id.rateText);
         statusText = findViewById(R.id.statusText);
         lastUpdatedText = findViewById(R.id.lastUpdatedText);
+        chartStatusText = findViewById(R.id.chartStatusText);
         emptyAlertsText = findViewById(R.id.emptyAlertsText);
+        kLineChartView = findViewById(R.id.kLineChartView);
         refreshProgress = findViewById(R.id.refreshProgress);
         refreshButton = findViewById(R.id.refreshButton);
+        refreshChartButton = findViewById(R.id.refreshChartButton);
         addAlertButton = findViewById(R.id.addAlertButton);
+        testAlertButton = findViewById(R.id.testAlertButton);
         monitorSwitch = findViewById(R.id.monitorSwitch);
         conditionSpinner = findViewById(R.id.conditionSpinner);
         unitSpinner = findViewById(R.id.unitSpinner);
@@ -146,7 +155,9 @@ public class MainActivity extends Activity {
 
     private void setupInteractions() {
         refreshButton.setOnClickListener(view -> refreshPrice());
+        refreshChartButton.setOnClickListener(view -> refreshKLine());
         addAlertButton.setOnClickListener(view -> addAlert());
+        testAlertButton.setOnClickListener(view -> testAlert());
         monitorSwitch.setOnCheckedChangeListener((button, checked) -> {
             if (suppressMonitorChange) {
                 return;
@@ -159,6 +170,27 @@ public class MainActivity extends Activity {
             } else {
                 stopMonitorService();
                 Toast.makeText(this, "后台监测已关闭", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void refreshKLine() {
+        refreshChartButton.setEnabled(false);
+        chartStatusText.setText("正在加载 K 线");
+        executor.execute(() -> {
+            try {
+                KLineSeries series = repository.fetchKLineSeries();
+                mainHandler.post(() -> {
+                    kLineChartView.setEntries(series.entries);
+                    refreshChartButton.setEnabled(true);
+                    chartStatusText.setText("数据源：" + series.sourceName);
+                });
+            } catch (Exception exception) {
+                String message = readableError(exception);
+                mainHandler.post(() -> {
+                    refreshChartButton.setEnabled(true);
+                    chartStatusText.setText("K 线刷新失败：" + message);
+                });
             }
         });
     }
@@ -235,6 +267,37 @@ public class MainActivity extends Activity {
         storage.saveAlerts(alerts);
         thresholdInput.setText("");
         renderAlerts();
+
+        if (latestPrice != null && alert.isCurrentlyTriggered(latestPrice)) {
+            alert.inTriggeredState = true;
+            alert.lastTriggeredAtMillis = System.currentTimeMillis();
+            storage.saveAlerts(alerts);
+            boolean posted = AlertNotifier.sendAlertNotification(this, alert, latestPrice);
+            if (!posted) {
+                requestNotificationPermissionIfNeeded();
+                Toast.makeText(this, "通知权限未开启，无法响铃提醒", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        if (!storage.isMonitoringEnabled()) {
+            suppressMonitorChange = true;
+            monitorSwitch.setChecked(true);
+            suppressMonitorChange = false;
+            storage.setMonitoringEnabled(true);
+            requestNotificationPermissionIfNeeded();
+            startMonitorService();
+            Toast.makeText(this, "已开启后台监测", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void testAlert() {
+        requestNotificationPermissionIfNeeded();
+        boolean posted = AlertNotifier.sendTestNotification(this);
+        if (posted) {
+            Toast.makeText(this, "已发送测试提醒", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "通知权限未开启，无法发送测试提醒", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void renderAlerts() {
@@ -303,6 +366,16 @@ public class MainActivity extends Activity {
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATIONS);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_NOTIFICATIONS
+                && grantResults.length > 0
+                && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "通知权限被拒绝，价格触发后不会响铃", Toast.LENGTH_LONG).show();
         }
     }
 

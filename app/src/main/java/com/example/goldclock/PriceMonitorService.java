@@ -7,9 +7,6 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.media.AudioAttributes;
-import android.media.RingtoneManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -34,7 +31,6 @@ public class PriceMonitorService extends Service {
     public static final String EXTRA_ERROR = "error";
 
     private static final String CHANNEL_MONITOR = "gold_clock_monitor";
-    private static final String CHANNEL_ALERTS = "gold_clock_alerts";
     private static final int MONITOR_NOTIFICATION_ID = 1001;
     private static final long POLL_INTERVAL_MS = 60_000L;
 
@@ -119,7 +115,7 @@ public class PriceMonitorService extends Service {
 
         for (GoldAlert alert : alerts) {
             if (alert.updateAndShouldTrigger(price)) {
-                sendAlertNotification(alert, price);
+                AlertNotifier.sendAlertNotification(this, alert, price);
             }
         }
         storage.saveAlerts(alerts);
@@ -148,34 +144,6 @@ public class PriceMonitorService extends Service {
         manager.notify(MONITOR_NOTIFICATION_ID, buildMonitorNotification(contentText));
     }
 
-    private void sendAlertNotification(GoldAlert alert, GoldPrice price) {
-        String threshold = formatValue(alert.unit, alert.threshold);
-        String current = formatValue(alert.unit, alert.currentValue(price));
-        String direction = GoldAlert.CONDITION_BELOW.equals(alert.condition)
-                ? "下跌到或低于"
-                : "上涨到或高于";
-        String body = "目标 " + direction + " " + threshold + "，当前 " + current;
-
-        Intent intent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(
-                this,
-                (int) System.currentTimeMillis(),
-                intent,
-                pendingIntentFlags());
-
-        Notification notification = new Notification.Builder(this, CHANNEL_ALERTS)
-                .setSmallIcon(R.drawable.ic_stat_gold_clock)
-                .setContentTitle("金价预警")
-                .setContentText(body)
-                .setStyle(new Notification.BigTextStyle().bigText(body))
-                .setCategory(Notification.CATEGORY_ALARM)
-                .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
-                .build();
-
-        notificationManager().notify((int) (System.currentTimeMillis() % Integer.MAX_VALUE), notification);
-    }
-
     private void createNotificationChannels() {
         NotificationChannel monitor = new NotificationChannel(
                 CHANNEL_MONITOR,
@@ -183,22 +151,9 @@ public class PriceMonitorService extends Service {
                 NotificationManager.IMPORTANCE_LOW);
         monitor.setDescription("显示 Gold Clock 正在后台刷新金价。");
 
-        Uri sound = defaultAlertSound();
-        AudioAttributes attributes = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build();
-        NotificationChannel alerts = new NotificationChannel(
-                CHANNEL_ALERTS,
-                "Gold Clock 金价预警",
-                NotificationManager.IMPORTANCE_HIGH);
-        alerts.setDescription("价格触发预警时响铃通知。");
-        alerts.enableVibration(true);
-        alerts.setSound(sound, attributes);
-
         NotificationManager manager = notificationManager();
         manager.createNotificationChannel(monitor);
-        manager.createNotificationChannel(alerts);
+        AlertNotifier.createAlertChannel(this);
     }
 
     private void sendPriceUpdate(GoldPrice price) {
@@ -230,27 +185,12 @@ public class PriceMonitorService extends Service {
         return (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
     }
 
-    private Uri defaultAlertSound() {
-        Uri alarm = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-        if (alarm != null) {
-            return alarm;
-        }
-        return RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-    }
-
     private int pendingIntentFlags() {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             flags |= PendingIntent.FLAG_IMMUTABLE;
         }
         return flags;
-    }
-
-    private String formatValue(String unit, double value) {
-        if (GoldAlert.UNIT_USD_OUNCE.equals(unit)) {
-            return String.format(Locale.CHINA, "$%,.2f/金衡盎司", value);
-        }
-        return String.format(Locale.CHINA, "¥%,.2f/克", value);
     }
 
     private String readableError(Exception exception) {
