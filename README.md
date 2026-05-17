@@ -35,10 +35,8 @@ Gold Clock 是一个原生 Android 应用，用于查看实时黄金价格，并
 
 用 Android Studio 打开本目录，等待 Gradle 同步，然后运行 `app`。
 
-命令行构建需要本机安装 Android SDK、JDK 17 和 Gradle：
+命令行构建需要本机安装 Android SDK 和 JDK 17：
 
 ```bash
-gradle assembleDebug
+./gradlew assembleDebug
 ```
-
-当前仓库没有提交 Gradle wrapper，因为本机没有全局 Gradle 或 Android SDK 可用于生成和验证 wrapper。
